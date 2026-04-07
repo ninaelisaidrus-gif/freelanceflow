@@ -505,15 +505,29 @@ function showSyncBar(type){
 }
 async function loadFromDrive(){
   if(!GAS_URL)return null;
-  try{const res=await fetch(GAS_URL,{method:'GET',cache:'no-cache'});const j=await res.json();return j&&j.clients?j:null}catch{return null}
+  try{
+    const res=await fetch(GAS_URL+'?action=load',{method:'GET',cache:'no-cache',redirect:'follow'});
+    const text=await res.text();
+    const j=JSON.parse(text);
+    return j&&j.clients?j:null;
+  }catch{return null}
 }
 async function saveToDrive(d){
   if(!GAS_URL)return;
   try{
-    const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
-    const r=await res.json();
-    if(r.status==='ok')showSyncBar('ok');else showSyncBar('err');
-  }catch{showSyncBar('err')}
+    // GAS werkt het beste met form-encoded POST of query param
+    const url=GAS_URL+'?action=save';
+    const res=await fetch(url,{
+      method:'POST',
+      redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(d)
+    });
+    const text=await res.text();
+    const r=JSON.parse(text);
+    // GAS geeft {ok:true,...} terug bij succes
+    if(r.ok===true||r.status==='ok'||r.status==='saved')showSyncBar('ok');else showSyncBar('err');
+  }catch(e){console.warn('Drive sync fout:',e);showSyncBar('err')}
 }
 function startDriveSync(){
   if(!GAS_URL)return;
@@ -1038,7 +1052,14 @@ function renderWeek(){
   // Tabs
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===S.activeTab));
   const _now=new Date();
-  const overCount=data.projects.filter(p=>!p.isInternal&&overInfo(p,data.tasks,_now.getMonth(),_now.getFullYear()).isOver).length;
+  const _nm=_now.getMonth(),_ny=_now.getFullYear(),_ncur=_ny*12+_nm;
+  const overCount=data.projects.filter(p=>{
+    if(p.isInternal)return false;
+    // Zelfde datum-range filter als renderTabOveruren
+    if(p.startMonth!==undefined&&p.startYear!==undefined&&_ncur<p.startYear*12+p.startMonth)return false;
+    if(p.endMonth!==undefined&&p.endYear!==undefined&&_ncur>p.endYear*12+p.endMonth)return false;
+    return overInfo(p,data.tasks,_nm,_ny).isOver;
+  }).length;
   const tabOB=document.getElementById('tab-over-btn');
   tabOB.querySelector('.tab-badge')?.remove();
   if(overCount>0){const sp=document.createElement('span');sp.className='tab-badge';sp.textContent=overCount;tabOB.appendChild(sp)}

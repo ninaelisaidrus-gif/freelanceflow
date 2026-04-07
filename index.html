@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FreelanceFlow</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
 
 /* LOGIN SCREEN */
 #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;z-index:9999}
@@ -19,10 +18,10 @@
 .login-btn{width:100%;padding:12px;background:linear-gradient(135deg,#0891b2,#2563eb);color:#fff;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:.15s}
 .login-btn:hover{opacity:.9;transform:translateY(-1px)}
 .login-err{color:#ef4444;font-size:12px;margin-top:8px;min-height:18px}
-.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0}
 .sync-dot.green{background:#10b981}.sync-dot.yellow{background:#f59e0b}.sync-dot.red{background:#ef4444}
-#drive-status{font-size:10px;color:#94a3b8;padding:8px 14px;text-align:center;border-top:1px solid #f1f5f9}
-
+#drive-status{font-size:10px;color:#94a3b8;padding:7px 14px;display:flex;align-items:center;border-top:1px solid #f1f5f9}
+*{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;height:100vh;overflow:hidden;color:#1e293b}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:#f1f5f9}
@@ -331,7 +330,6 @@ input,select,textarea{font-family:inherit}
 </style>
 </head>
 <body>
-
 <!-- LOGIN SCREEN -->
 <div id="login-screen">
   <div class="login-card">
@@ -343,7 +341,6 @@ input,select,textarea{font-family:inherit}
     <div class="login-err" id="login-err"></div>
   </div>
 </div>
-
 <div id="app">
   <aside id="sidebar">
     <div class="sidebar-logo">
@@ -355,8 +352,8 @@ input,select,textarea{font-family:inherit}
       <h4>Overzicht</h4>
       <div id="sidebar-stats"></div>
     </div>
-    <div id="drive-status"><span class="sync-dot yellow" id="sync-dot"></span><span id="sync-label">Drive sync niet geconfigureerd</span></div>
-    <button onclick="logout()" style="margin:0 8px 10px;width:calc(100% - 16px);padding:7px;background:#fef2f2;color:#ef4444;border-radius:9px;font-size:12px;font-weight:600;text-align:left;display:flex;align-items:center;gap:7px"><span>🚪</span> Uitloggen</button>
+    <div id="drive-status" style="display:none"><span class="sync-dot green" id="sync-dot"></span><span id="sync-label"></span></div>
+    <button onclick="logout()" style="margin:0 8px 10px;width:calc(100% - 16px);padding:7px;background:#fef2f2;color:#ef4444;border-radius:9px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px"><span>🚪</span> Uitloggen</button>
   </aside>
   <div id="main">
     <!-- WEEK VIEW -->
@@ -462,59 +459,45 @@ input,select,textarea{font-family:inherit}
 <div id="modals"></div>
 
 <script>
-
 // ═══════════════════════════════════════════════
-//  CONFIGURATIE — vul in na Google Apps Script deploy
+//  CONFIG — vul GAS_URL in na Google Apps Script deploy
 // ═══════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbz_3SQRQ7KuGCJSmu1Hj-JmBy7wOzRrOw6UkcKcm5-v/exec'; // Plak hier je Google Apps Script deployment URL
-const PASSWORD_HASH = '3306b7aebb6e3f22bca7b8ee73b4b4fdcaf5ba832e7d84f2a256ee70917f9db4'; // SHA-256 van je wachtwoord
-const SYNC_INTERVAL_MS = 5000; // sync elke 5 seconden
+const GAS_URL = ''; // Plak hier je deployment URL
+const PASSWORD_HASH = '3306b7aebb6e3f22bca7b8ee73b4b4fdcaf5ba832e7d84f2a256ee70917f9db4';
+const SYNC_INTERVAL_MS = 5000;
 
-// ─── Auth ───────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────
 async function sha256(str){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
-
 function isLoggedIn(){return sessionStorage.getItem('ff_auth')==='1'}
 function setLoggedIn(){sessionStorage.setItem('ff_auth','1')}
 function logout(){sessionStorage.removeItem('ff_auth');location.reload()}
+function showApp(){document.getElementById('login-screen').classList.add('hidden')}
+function showLogin(){document.getElementById('login-screen').classList.remove('hidden')}
 
-function showApp(){
-  document.getElementById('login-screen').classList.add('hidden');
-}
-function showLogin(){
-  document.getElementById('login-screen').classList.remove('hidden');
-}
-
-document.getElementById('login-btn').addEventListener('click', doLogin);
-document.getElementById('login-pw').addEventListener('keydown', e=>{if(e.key==='Enter')doLogin()});
+document.getElementById('login-btn').addEventListener('click',doLogin);
+document.getElementById('login-pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
 async function doLogin(){
   const pw=document.getElementById('login-pw').value;
   const err=document.getElementById('login-err');
   if(!pw){err.textContent='Vul een wachtwoord in';return}
   const hash=await sha256(pw);
-  if(hash===PASSWORD_HASH){
-    setLoggedIn();
-    showApp();
-    initApp();
-  } else {
-    err.textContent='Onjuist wachtwoord. Probeer opnieuw.';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
+  if(hash===PASSWORD_HASH){setLoggedIn();showApp();initApp()}
+  else{err.textContent='Onjuist wachtwoord. Probeer opnieuw.';document.getElementById('login-pw').value='';document.getElementById('login-pw').focus()}
 }
 
-// ─── Google Drive Sync ──────────────────────────
-let syncTimer=null;
-let lastSyncData='';
-let syncPending=false;
+// ── Google Drive Sync ─────────────────────────────────────────────────────
+let syncTimer=null, lastSyncData='';
 
-function setSyncStatus(state, label){
+function setSyncStatus(state,label){
+  const ds=document.getElementById('drive-status');
   const dot=document.getElementById('sync-dot');
   const lbl=document.getElementById('sync-label');
-  if(!dot||!lbl)return;
+  if(!ds||!dot||!lbl)return;
+  ds.style.display='flex';
   dot.className='sync-dot '+state;
   lbl.textContent=label;
 }
@@ -524,46 +507,33 @@ async function loadFromDrive(){
   try{
     setSyncStatus('yellow','Laden uit Drive...');
     const res=await fetch(GAS_URL,{method:'GET',cache:'no-cache'});
-    if(!res.ok)throw new Error('HTTP '+res.status);
     const text=await res.text();
-    if(!text||text==='null')return null;
-    const parsed=JSON.parse(text);
-    setSyncStatus('green','Drive geladen ✓');
-    return parsed;
-  }catch(e){
-    setSyncStatus('red','Drive niet bereikbaar');
-    return null;
-  }
+    if(!text||text==='null'||text.includes('"ok":false'))return null;
+    return JSON.parse(text);
+  }catch(e){setSyncStatus('red','Drive niet bereikbaar');return null}
 }
 
 async function saveToDrive(data){
   if(!GAS_URL)return;
   const json=JSON.stringify(data);
-  if(json===lastSyncData)return; // niets veranderd
+  if(json===lastSyncData)return;
   try{
-    setSyncStatus('yellow','Opslaan naar Drive...');
-    const res=await fetch(GAS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:json
-    });
+    setSyncStatus('yellow','Opslaan...');
+    const res=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:json});
     if(!res.ok)throw new Error('HTTP '+res.status);
     lastSyncData=json;
-    setSyncStatus('green','Drive gesynchroniseerd ✓');
-  }catch(e){
-    setSyncStatus('red','Sync mislukt — lokaal opgeslagen');
-  }
+    setSyncStatus('green','Gesynchroniseerd ✓');
+  }catch(e){setSyncStatus('red','Sync mislukt')}
 }
 
 function startDriveSync(){
-  if(!GAS_URL){setSyncStatus('yellow','Drive sync niet geconfigureerd');return}
+  if(!GAS_URL)return; // geen URL = stil blijven
   if(syncTimer)clearInterval(syncTimer);
-  syncTimer=setInterval(()=>saveToDrive(S.data), SYNC_INTERVAL_MS);
+  syncTimer=setInterval(()=>saveToDrive(S.data),SYNC_INTERVAL_MS);
   setSyncStatus('green','Drive sync actief');
 }
 
 async function initApp(){
-  // Probeer data van Drive te laden
   if(GAS_URL){
     const driveData=await loadFromDrive();
     if(driveData&&driveData.clients){
@@ -575,7 +545,6 @@ async function initApp(){
   startDriveSync();
   render();
 }
-
 
 // ═══════════════════════════════════════════════
 //  CONSTANTS
@@ -1186,7 +1155,14 @@ function renderTabOveruren(){
   const{data}=S;
   const _ws=weekDates(S.viewW,S.viewY)[0];
   const viewMonth=_ws.getMonth(),viewYear=_ws.getFullYear();
-  const overProjs=data.projects.filter(p=>!p.isInternal).map(p=>({proj:p,cli:getCli(p.clientId),info:overInfo(p,data.tasks,viewMonth,viewYear)})).filter(x=>x.info.isOver);
+  const cur=viewYear*12+viewMonth;
+  const overProjs=data.projects.filter(p=>{
+    if(p.isInternal)return false;
+    // Skip project als het buiten zijn looptijd valt
+    if(p.startMonth!==undefined&&p.startYear!==undefined&&cur<p.startYear*12+p.startMonth)return false;
+    if(p.endMonth!==undefined&&p.endYear!==undefined&&cur>p.endYear*12+p.endMonth)return false;
+    return true;
+  }).map(p=>({proj:p,cli:getCli(p.clientId),info:overInfo(p,data.tasks,viewMonth,viewYear)})).filter(x=>x.info.isOver);
   if(!overProjs.length){document.getElementById('tab-overuren').innerHTML=`<div class="empty-state" style="padding:24px 0"><div style="font-size:34px;margin-bottom:7px">✅</div><p>Geen overuren!</p><small>Alle projecten binnen budget.</small></div>`;return}
   const totLoss=overProjs.reduce((s,x)=>s+x.info.loss,0);
   const totOver=overProjs.reduce((s,x)=>s+x.info.over,0);
@@ -1790,7 +1766,6 @@ document.getElementById('btn-clear').addEventListener('click',()=>{if(confirm('A
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-// Initialiseer — check auth
 if(isLoggedIn()){showApp();initApp()}else{showLogin()}
 </script>
 </body>

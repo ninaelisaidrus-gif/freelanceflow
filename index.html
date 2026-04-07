@@ -1092,7 +1092,14 @@ function renderInplan(){
   vacRow.addEventListener('dragstart',e=>{e.dataTransfer.setData('vacationDrop','1');e.dataTransfer.effectAllowed='copy'});
   inplanEl.appendChild(vacRow);
 
-  const clientProjects=data.projects.filter(p=>!p.isInternal);
+  // Filter op datum range: alleen projecten die actief zijn in de bekeken maand
+  const _vcur=viewYear*12+viewMonth;
+  const clientProjects=data.projects.filter(p=>{
+    if(p.isInternal)return false;
+    if(p.startMonth!==undefined&&p.startYear!==undefined&&_vcur<p.startYear*12+p.startMonth)return false;
+    if(p.endMonth!==undefined&&p.endYear!==undefined&&_vcur>p.endYear*12+p.endMonth)return false;
+    return true;
+  });
   const internProj=data.projects.find(p=>p.isInternal);
   if(!clientProjects.length&&!internProj){inplanEl.innerHTML+='<p style="font-size:11px;color:#94a3b8;font-style:italic">Geen projecten</p>';return}
 

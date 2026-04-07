@@ -584,10 +584,10 @@ let _pendingDriveSave=null;
 function saveData(d){
   try{localStorage.setItem(KEY,JSON.stringify(d))}catch{}
   if(fileHandle){writeToFile(d).catch(()=>{})}
-  // Debounced Drive save: wacht 2s na laatste wijziging, dan pas sync
+  // Debounced Drive save: wacht 500ms na laatste wijziging, dan pas sync
   if(GAS_URL&&localStorage.getItem('ff_auth')==='1'){
     if(_pendingDriveSave)clearTimeout(_pendingDriveSave);
-    _pendingDriveSave=setTimeout(()=>{saveToDrive(d);_pendingDriveSave=null},2000);
+    _pendingDriveSave=setTimeout(()=>{saveToDrive(d);_pendingDriveSave=null},500);
   }
 }
 async function writeToFile(d){
@@ -1920,6 +1920,14 @@ if(localStorage.getItem('ff_auth')==='1'){
   document.getElementById('app').style.display='none';
   render();
 }
+
+// ── Zorg dat data altijd naar Drive gesaved wordt bij refresh/sluiten ──────
+window.addEventListener('beforeunload',()=>{
+  if(GAS_URL&&localStorage.getItem('ff_auth')==='1'){
+    if(_pendingDriveSave){clearTimeout(_pendingDriveSave);_pendingDriveSave=null;}
+    saveToDrive(S.data);
+  }
+});
 </script>
 </body>
 </html>
